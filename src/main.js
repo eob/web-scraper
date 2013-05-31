@@ -34,12 +34,6 @@ exports.run = function() {
     outputDir = argv._[2];
   }
 
-  // Create the Workspace directory if it doesn't exist
-  if (! fs.existsSync(outputDir)) {
-    console.log("Creating output directory: " + outputDir);
-    fs.mkdirSync(outputDir);
-  }
-
   var opts = {
     url: url,
     filename: pageName,

@@ -222,6 +222,11 @@ WebScraper.prototype.savePage = function(html) {
 };
 
 WebScraper.prototype.scrape = function(success, failure) {
+  // Create the Workspace directory if it doesn't exist
+  if (! fs.existsSync(this.opts.basedir)) {
+    fs.mkdirSync(this.opts.basedir);
+  }
+
   FetchUrl(this.opts.url,
     function(html) {
       this.queueAndSaveAssets(html,
