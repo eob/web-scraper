@@ -31,10 +31,16 @@ WebScraper = function(opts) {
   if (typeof this.opts.filename == 'undefined') {
     this.opts.filename = 'index.html';
   }
+
+  this.urlsDownloaded = {};
 };
 
 WebScraper.prototype.endsWith = function(s, suffix) {
   return s.indexOf(suffix, s.length - suffix.length) !== -1;
+}
+
+WebScraper.prototype.startsWith = function(s, suffix) {
+  return s.indexOf(suffix) === 0;
 }
 
 WebScraper.prototype.filenameForUrl = function(url, kind) {
@@ -64,7 +70,7 @@ WebScraper.prototype.isCssLink = function(e) {
        (e.prop('type').indexOf('css') != -1)
     ) || (
        (! _.isUndefined(e.attr('rel'))) && 
-       (e.attr('rel') == 'stylesheets')
+       (e.attr('rel') == 'stylesheet')
     )
   );
 };
@@ -171,6 +177,11 @@ WebScraper.prototype.queueAndSaveAssets = function(html, success, failure) {
         _.each($('img'), function(elem) { considerElement($(elem)) });
         _.each($('script'), function(elem) { considerElement($(elem)) });
         _.each($('link'), function(elem) { considerElement($(elem)) });
+        // Snag any asset URLs out of inline CSS
+        _.each($('style'), function(elem) {
+          var e = $(elem);
+          e.html(this.fixCssAndQueueFurtherAssets(e.html(), true, self.opts.url));
+        });
         // Stash 'em away. Thar be ajax acomin'.
         self.fixedHtml = window.document.documentElement.innerHTML;
         self.queueAndSaveSuccess = success;
@@ -187,13 +198,21 @@ WebScraper.prototype.saveAsset = function() {
   } else {
     // pop one off
     var asset = this.assetQueue[0];
-    FetchUrl(asset, this.saveAssetSuccess, this.saveAssetFailure, undefined, this);
+    if (this.urlsDownloaded[asset.url] === true) {
+      this.assetQueue.shift();
+      this.saveAsset();
+    } else {
+      FetchUrl(asset, this.saveAssetSuccess, this.saveAssetFailure, undefined, this);
+    }
   }
 };
 
 WebScraper.prototype.saveAssetSuccess = function(data) {
   var asset = this.assetQueue.shift();
   try {
+    if (asset.type == 'css') {
+      data = this.fixCssAndQueueFurtherAssets(data, false, asset.url);
+    }
     var filename = path.join(this.opts.basedir, asset.localUrl);
     // Ensure the path
     var pathname = path.dirname(filename);
@@ -201,11 +220,44 @@ WebScraper.prototype.saveAssetSuccess = function(data) {
       fs.mkdirSync(pathname);
     }
     fs.writeFileSync(filename, data, "utf8");
+    this.urlsDownloaded[asset.url] = true;
   } catch (e) {
     //console.log("Failed to save asset to disk");
-    //console.log(e);
+    console.log(e);
   }
   this.saveAsset();
+};
+
+/**
+ * Finds any file references in the CSS and fixes them.
+ */
+WebScraper.prototype.fixCssAndQueueFurtherAssets = function(css, inlineCss, linkedFrom) {
+  var copy = "" + css;
+  var pat = /url\(([^\)]+)\)/g;
+  var prefix = "../images/";
+  if (inlineCss) {
+    prefix = "images/";
+  }
+  while (match = pat.exec(css)) {
+    var url = match[1];
+    // Avoid images that are serialized inline.
+    if (! this.startsWith(this.filenameForUrl(url), "png;base64,")) {
+      var localUrl = path.join('images', this.filenameForUrl(url));
+      var cssUrl = prefix + this.filenameForUrl(url);
+      var fileSpec = {
+        binary: true,
+        type: 'image',
+        localUrl: localUrl,
+        url: url,
+        linkedFrom: linkedFrom 
+      };
+      this.assetQueue.push(fileSpec);
+      var before = "url(" + url + ")";
+      var after = "url(" + cssUrl + ")";
+      copy = copy.replace(before, after);
+    }
+  }
+  return copy;
 };
 
 WebScraper.prototype.saveAssetFailure = function(e) {
