@@ -1,42 +1,31 @@
 {
   "name": "web-scraper",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Helps you scrape a web page.",
   "keywords": [
     "scraper",
     "scraping",
     "web"
   ],
-  "maintainers": [
-  {
-    "name": "Sarah Scodel",
-    "email": "sscodel@mit.edu"
-  },
-  {
-    "name": "Jason Yonglin Wu",
-    "email": "ylwu@mit.edu"
-  },
-  {
+  "author": {
     "name": "Ted Benson",
     "email": "eob@csail.mit.edu",
     "url": "http://www.edwardbenson.com/"
-  }],
-  "contributors": [
-  ],
+  },
   "bugs": {
     "email": "eob@csail.mit.edu",
-    "url": "https://github.com/cts/jailbreak-wordpress/issues"
+    "url": "https://github.com/cts/web-scraper/issues"
   },
   "licenses": [
     {
       "type": "MIT",
-      "url": "http://github.com/webcats/dscrape/blob/master/LICENSE.txt"
+      "url": "http://github.com/cts/web-scraper/blob/master/LICENSE.txt"
     }
   ],
   "repositories": [
     {
       "type": "git",
-      "url": "http://github.com/cts/jailbreak-wordpress.git"
+      "url": "http://github.com/cts/web-scraper.git"
     }
   ],
   "dependencies": {
@@ -51,13 +40,6 @@
     "fetch-url": "*"
   },
   "devDependencies": {
-    "grunt": "*",
-    "grunt-contrib-jshint": "~0.1.1",
-    "grunt-contrib-nodeunit": "~0.1.2",
-    "grunt-contrib-uglify": "*",
-    "grunt-contrib-qunit": "*",
-    "grunt-contrib-concat": "*",
-    "grunt-contrib-watch": "*"
   },
   "engines": {
     "node": ">=0.1.9"
@@ -68,6 +50,6 @@
   "bin": {
     "scrape": "./bin/scrape"
   },
-  "main": "./lib"
+  "main": "./src/scraper.js"
 }
 
