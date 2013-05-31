@@ -10,7 +10,11 @@ var Uri = require("jsuri");
 var FetchUrl = require("fetch-url");
 var _ = require("underscore");
 
-function WebScraper = function() {
+function WebScraper = function(opts) {
+  self.opts = opts;
+  if (typeof self.opts.basedir == 'undefined') {
+    self.opts.basedir = '.';
+  }
 };
 
 WebScraper.prototype.endsWith(s, suffix) {
@@ -57,7 +61,7 @@ WebScraper.prototype.isCssLink = function(e) {
  *  binary: true/false
  *  type: image, css, etc etc
  */
-WebScraper.prototype.extractFilespec = function(jqElem) {
+WebScraper.prototype.extractFilespec = function(jqElem, fixToo) {
   var ret = {};
   if (jqElem.is('link')) {
     ret.binary = false;
@@ -71,11 +75,17 @@ WebScraper.prototype.extractFilespec = function(jqElem) {
       ret.type = 'other';
       ret.localUrl = 'other/' = WebScraper.filenameForUrl(ret.url);
     }
+    if (fixToo) {
+      jqElem.attr('href', ret.localUrl);
+    }
   } else if (jqElem.is('img')) {
     ret.binary = true;
     ret.url = jqElem.attr('src');
     ret.type = 'image';
     ret.localUrl = 'images/' + WebScraper.filenameForUrl(ret.url);
+    if (fixToo) {
+      jqElem.attr('src', ret.localUrl);
+    }
   } else if (jqElem.is('script')) {
     ret.binary = false;
     ret.url = jqElem.attr('src');
@@ -84,6 +94,9 @@ WebScraper.prototype.extractFilespec = function(jqElem) {
     } else {
       ret.type = 'js';
       ret.localUrl = 'js/' + WebScraper.filenameForUrl(ret.url);
+      if (fixToo) {
+        jqElem.attr('src', ret.localUrl);
+      }
     }
   }
   return ret;
@@ -92,30 +105,82 @@ WebScraper.prototype.extractFilespec = function(jqElem) {
 /**
  * Rewrites HTML such that all images are
  */
-WebScraper.prototype.rewritePage = function(html) {
-}
-
-WebScraper.prototype.saveAssets = function(html, opts, success, failure) {
+WebScraper.prototype.queueAndSaveAssets = function(html, success, failure) {
   this.assetQueue = [];
+  var self = this;
 
-  // Fill up the asset queue
+  var considerElement(elem) {
+    var fileSpec = self.extractFilespec($(elem), true);
+    if (fileSpec !== null) {
+      self.assetQueue.push(fileSpec);
+    }
+  }
+
+  /*
+   * Queue up all the assets to download
+   */
   jsdom.env({
     html: html,
     scripts: ["http://ajax.googleapis.com/ajax/libs/jquery/2.0.0/jquery.min.js"],
-
-
-
+    done: function(errors, window) {
+      if (errors) {
+        failure(errors);
+      } else {
+        // Walk the DOM and get each asset.
+        var $ = window.$;
+        _.each($('img'), function(elem) { considerElement(elem) });
+        _.each($('script'), function(elem) { considerElement(elem) });
+        _.each($('link'), function(elem) { considerElement(elem) });
+        // Stash 'em away. Thar be ajax acomin'.
+        self.fixedHtml = window.document.documentElement.innerHTML;
+        self.queueAndSaveSuccess = success;
+        self.queueAndSaveFailure = failure;
+        self.saveAsset();
+      } // if no errors
+    } // done
+  });
 };
 
-WebScraper.prototype.savePage = function(html, opts) {
+WebScraper.saveAsset = function() {
+  if (this.assetQueue.length == 0) {
+    this.queueAndSaveSuccess();
+  } else {
+    // pop one off
+    var asset = this.assetQueue[0];
+    FetchUrl(asset.url, this.saveAssetSuccess, this.saveAssetFailure, undefined, this);
+  }
 };
 
-WebScraper.prototype.scrape = function(opts, succes, failure) {
-  FetchUrl(opts.url,
+WebScraper.saveAssetSuccess = function(data) {
+  var asset = this.assetQueue.shift();
+  try {
+    fs.writeFileSync(path.join(self.opts.basedir, asset.localUrl), data, "utf8");
+  } catch (e) {
+    // Soft failure
+  }
+  this.saveAsset();
+};
+
+WebScraper.saveAssetFailure = function() {
+  // Well.. nothing much can be done. We're not going to
+  // hard fail here because so many sites have broken links.
+  this.assetQueue.shift();
+  this.saveAsset();
+}
+
+WebScraper.prototype.savePage = function(html) {
+  fs.writeFileSync(path.join(self.opts.basedir, self.opts.filename), html, "utf8");
+};
+
+/*
+ * opts.filename  -  Name of html file to save to
+ * opts.basedir   -  Base directory in which to extract
+ */
+WebScraper.prototype.scrape = function(succes, failure) {
+  FetchUrl(self.opts.url,
     function(html) {
-      this.saveAssets(html, opts,
-        function() {
-          var fixedHtml = this.rewritePage(html);
+      this.queueAndSaveAssets(html,
+        function(fixedHtml) {
           this.savePage(fixedHtml, opts);
           success();
         },
@@ -125,7 +190,9 @@ WebScraper.prototype.scrape = function(opts, succes, failure) {
       );
     }, function(err) {
       failure(err);
-    }
+    },
+    'utf-8',
+    this
   );
 };
 
