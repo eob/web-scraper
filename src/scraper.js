@@ -10,11 +10,26 @@ var Uri = require("jsuri");
 var FetchUrl = require("fetch-url");
 var _ = require("underscore");
 var jsdom = require("jsdom");
+var fs = require("fs");
+var path = require("path");
 
+/*
+ * Required
+ *
+ *   opts.url       -  URL to scrape
+ *
+ * Optional
+ *
+ *   opts.filename  -  Name of html file to save to
+ *   opts.basedir   -  Base directory in which to extract
+ */
 WebScraper = function(opts) {
   this.opts = opts;
   if (typeof this.opts.basedir == 'undefined') {
     this.opts.basedir = '.';
+  }
+  if (typeof this.opts.filename == 'undefined') {
+    this.opts.filename = 'index.html';
   }
 };
 
@@ -60,38 +75,6 @@ WebScraper.prototype.isRssLink = function(e) {
       (e.prop('type').indexOf('rss') != 1)
   );
 }
-
-
-  var fixUrl = function(url, fileRef) {
-    var fixed = "";
-    if (url.substring(0,2) == "//") {
-      fixed = "http:" + url;
-    } else if ((url.substring(0,1) == "/") && (typeof fileRef.linkedFrom != 'undefined')) {
-      // Absolute path
-      var linked = new Uri(fileRef.linkedFrom);
-      fixed = linked.protocol() + '://' + linked.host();
-      if (linked.port().length > 0) {
-        fixed += ':' + linked.port();
-      }
-      fixed += url;
-    } else if ((url.substring(0,4) != 'http') && (typeof fileRef.linkedFrom != 'undefined')) {
-      // Relative path
-      var linked = new Uri(fileRef.linkedFrom);
-      fixed = linked.protocol() + '://' + linked.host();
-      if (linked.port().length > 0) {
-        fixed += ':' + linked.port();
-      }
-      var parts = linked.path().split("/");
-      var filename = parts[parts.length - 1];
-      if ((filename != null) && (filename.length != 0)) {
-        parts.pop();
-      }
-      fixed += parts.join('/') + url;
-    } else {
-      fixed = url;
-    }
-    return fixed;
-  };
 
 /*
  * Given an HTML element that references a file, returns an object
@@ -153,15 +136,8 @@ WebScraper.prototype.extractFilespec = function(jqElem, fixToo) {
       }
     }
   }
-
   if (ret != null) {
     ret.linkedFrom = this.opts.url;
-  }
-
-  if (ret != null) {
-    console.log(ret);
-    ret.linkedFrom = this.opts.url;
-    console.log(fixUrl(ret.url, ret));
   }
   return ret;
 }
@@ -226,8 +202,8 @@ WebScraper.prototype.saveAssetSuccess = function(data) {
     }
     fs.writeFileSync(filename, data, "utf8");
   } catch (e) {
-    console.log("Failed to save asset to disk");
-    console.log(e);
+    //console.log("Failed to save asset to disk");
+    //console.log(e);
   }
   this.saveAsset();
 };
@@ -235,8 +211,8 @@ WebScraper.prototype.saveAssetSuccess = function(data) {
 WebScraper.prototype.saveAssetFailure = function(e) {
   // Well.. nothing much can be done. We're not going to
   // hard fail here because so many sites have broken links.
-  console.log("Failed to download asset");
-  console.log(e);
+  //console.log("Failed to download asset");
+  //console.log(e);
   this.assetQueue.shift();
   this.saveAsset();
 }
@@ -245,10 +221,6 @@ WebScraper.prototype.savePage = function(html) {
   fs.writeFileSync(path.join(this.opts.basedir, this.opts.filename), html, "utf8");
 };
 
-/*
- * opts.filename  -  Name of html file to save to
- * opts.basedir   -  Base directory in which to extract
- */
 WebScraper.prototype.scrape = function(success, failure) {
   FetchUrl(this.opts.url,
     function(html) {
