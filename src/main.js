@@ -6,6 +6,7 @@ fs = require('fs');
 path = require('path');
 optimist = require('optimist');
 url = require('url');
+Scraper = require('./scraper');
 
 BANNER = "Usage: scrape <OutputDir> <OutputFilename> <URL>";
 
@@ -23,56 +24,34 @@ exports.run = function() {
     return false;
   }
   
-  var outputDir = argv._[0];
-  var pageName = argv._[1];
-  var requestUrl = argv._[2];
+  var url = argv._[0];
+  var pageName = "index.html";
+  var outputDir = ".";
+
+  if (argv._.length > 1) {
+    pageName = argv._[1];
+  }
+  if (argv._.length > 2) {
+    outputDir = argv._[2];
+  }
 
   // Create the Workspace directory if it doesn't exist
   if (! fs.existsSync(outputDir)) {
+    console.log("Creating output directory: " + outputDir);
     fs.mkdirSync(outputDir);
   }
 
+  var opts = {
+    url: url,
+    filename: pageName,
+    basedir: outputDir
+  }
 
-  // Now we know that <Workspace Directory>/<Theme Directory> exists.
-
-  var options = {
-    FetchPages: true,
-    FetchAssets: true,
-    AnnotateDom: false,
-    OutputFiles: true
-  };
-
-  var pipeline = new Jailbreak.Pipeline.Pipeline(options);
-
-  /*
-   * TODO(jason): Create a content map PROGRAMMATICALLY
-   * see the file
-   *    content-maps/testmap.json
-   * as a guide
-   */
-  // We'll create this
-  var contentMapConfig = { 
-      name: "Single URL",
-      // TODO(jason)
-      // Parse out the domain from the URL
-      // e.g. "people.csail.mit.edu"
-      domain: url.parse(requestUrl, true).host,
-      pages: [
-        {
-          name: pageName,
-          // TODO(jason):
-          // Parse out the path from the url variable.
-          // e.g. "/karger"
-          path: url.parse(requestUrl,true).pathname
-        }
-      ]
-    };
-
-  // TODO(jason):
-  // I already modified the ContentMap constructor for you, so
-  // you can just pass this JSON object you create above into it.
-  // (I'd rather you spend time focusing on how the scraping pipeline works)
-  var contentMap = new Jailbreak.ContentMap(contentMapConfig);
-  var theme = new Jailbreak.Theme(themeName, themeDirectory, contentMap);
-  pipeline.run(theme);
+  var scraper = new Scraper(opts);
+  scraper.scrape(
+      function() {
+        console.log("\n\nSuccess!\n\n");
+      },
+      console.log
+  );
 };
