@@ -7,7 +7,7 @@ path = require('path');
 optimist = require('optimist');
 Scraper = require('./scraper');
 
-BANNER = "Usage: scrape <OutputDir> <OutputFilename> <URL>";
+BANNER = "Usage: scrape <URL> <OutputFilename> <OutputDir>";
 
 /*
  *
