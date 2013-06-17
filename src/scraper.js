@@ -15,13 +15,13 @@ var path = require("path");
 /*
  * A save function can be 
  */
-var LocalSaveFn = function(pathAndFilename, data, type, cb) {
+var LocalSaveFn = function(pathAndFilename, data, encoding, mime, cb) {
   var pathname = path.dirname(pathAndFilename);
   try {
     if (! fs.existsSync(pathname)) {
       fs.mkdirSync(pathname);
     }
-    fs.writeFileSync(pathAndFilename, data, type);
+    fs.writeFileSync(pathAndFilename, data, encoding);
     cb(null, pathAndFilename);
   } catch (e) {
     cb(e);
@@ -120,17 +120,38 @@ WebScraper.prototype.isRssLink = function(e) {
  */
 WebScraper.prototype.extractFilespec = function(jqElem, fixToo) {
   var ret = {};
+
+  var self = this;
+  var guessImageMime = function(fname) {
+    if (self.endsWith(fname, 'png')) {
+      return "image/png";
+    } else if (self.endsWith(fname, 'gif')) {
+      return "image/gif";
+    } else if (self.endsWith(fname, 'jpg')) {
+      return "image/jpg";
+    } else if (self.endsWith(fname, 'jpeg')) {
+      return "image/jpeg";
+    } else if (self.endsWith(fname, 'bmp')) {
+      return "image/bmp";
+    } else {
+      return "image/other";
+    }
+  }
+
   if (jqElem.is('link')) {
     ret.binary = false;
     ret.url = jqElem.attr('href');
     ret.linkedFrom = this.opts.url;
+    ret.encoding = "utf8";
 
     // Determine type.
     if (this.isCssLink(jqElem)) {
       ret.type = 'css';
+      ret.mimeType = "text/css";
       ret.localUrl = 'css/' + this.filenameForUrl(ret.url);
     } else if (this.isRssLink(jqElem)) {
       ret.type = 'rss';
+      ret.mimeType = "application/xml";
       ret.localUrl = 'rss/' + this.filenameForUrl(ret.url);
     } else {
       // We're going to put it in the other category. But first we'll try some common
@@ -141,8 +162,10 @@ WebScraper.prototype.extractFilespec = function(jqElem, fixToo) {
         ret.type = 'image';
         ret.localUrl = 'images/' + this.filenameForUrl(ret.url);
         ret.binary = true;
+        ret.mimeType = guessImageMime(ret.url);
       } else {
         ret.type = 'other';
+        ret.mimeType = "txt/plain";
         ret.localUrl = 'other/' + this.filenameForUrl(ret.url);
       }
     }
@@ -157,12 +180,14 @@ WebScraper.prototype.extractFilespec = function(jqElem, fixToo) {
     if (fixToo) {
       jqElem.attr('src', ret.localUrl);
     }
+    ret.mimeType = guessImageMime(ret.url);
   } else if (jqElem.is('script')) {
     ret.binary = false;
     ret.url = jqElem.attr('src');
     if (_.isUndefined(ret.url) || ret.url === null || ret.url === '') {
       ret = null;
     } else {
+      ret.mimeType = "application/javascript";
       ret.type = 'js';
       ret.localUrl = 'js/' + this.filenameForUrl(ret.url);
       if (fixToo) {
@@ -172,6 +197,9 @@ WebScraper.prototype.extractFilespec = function(jqElem, fixToo) {
   }
   if (ret !== null) {
     ret.linkedFrom = this.opts.url;
+    if (ret.binary) {
+      ret.encoding = "binary";
+    }
   }
   return ret;
 };
@@ -243,8 +271,9 @@ WebScraper.prototype.downloadAssetSuccess = function(data) {
       data = this.fixCssAndQueueFurtherAssets(data, false, asset.url);
     }
     var filename = path.join(this.opts.basedir, asset.localUrl);
+    var mimeType = null;
 
-    self.saveFn(filename, data, "utf8", function(err, res) {
+    self.saveFn(filename, data, asset.encoding, asset.mimeType, function(err, res) {
       if (err) {
       }
       self.urlsDownloaded[asset.url] = true;
@@ -303,7 +332,7 @@ WebScraper.prototype.downloadAssetFailure = function(e) {
 WebScraper.prototype.savePage = function(html, cb) {
   var fullPath = path.join(this.opts.basedir, this.opts.filename);
   var self = this;
-  this.saveFn(fullPath, html, "utf8", function(error, loc) {
+  this.saveFn(fullPath, html, "utf8", "text/html", function(error, loc) {
     if (error) {
       cb(error);
     } else {
