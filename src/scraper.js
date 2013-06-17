@@ -17,12 +17,11 @@ var path = require("path");
  */
 var LocalSaveFn = function(pathAndFilename, data, type, cb) {
   var pathname = path.dirname(pathAndFilename);
-  console.log("Saving", pathAndFilename);
   try {
     if (! fs.existsSync(pathname)) {
       fs.mkdirSync(pathname);
     }
-    fs.writeFileSync(path.join(this.opts.basedir, this.opts.filename), data, "utf8");
+    fs.writeFileSync(pathAndFilename, data, type);
     cb(null, pathAndFilename);
   } catch (e) {
     cb(e);
@@ -227,7 +226,6 @@ WebScraper.prototype.saveAsset = function() {
   } else {
     // pop one off
     var asset = this.assetQueue[0];
-    console.log(asset);
     if (this.urlsDownloaded[asset.url] === true) {
       this.assetQueue.shift();
       this.saveAsset();
@@ -248,7 +246,6 @@ WebScraper.prototype.downloadAssetSuccess = function(data) {
 
     self.saveFn(filename, data, "utf8", function(err, res) {
       if (err) {
-        console.log("ERROR!", err);
       }
       self.urlsDownloaded[asset.url] = true;
       self.saveAsset();
