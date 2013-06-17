@@ -17,6 +17,7 @@ var path = require("path");
  */
 var LocalSaveFn = function(pathAndFilename, data, type, cb) {
   var pathname = path.dirname(pathAndFilename);
+  console.log("Saving", pathAndFilename);
   try {
     if (! fs.existsSync(pathname)) {
       fs.mkdirSync(pathname);
@@ -71,9 +72,11 @@ WebScraper.prototype.startsWith = function(s, suffix) {
 
 WebScraper.prototype.filenameForUrl = function(url, kind) {
   var uri = new Uri(url);
-  var parts = uri.path().split("/");
-  var filename = parts[parts.length - 1];
-  if ((filename === null) || (filename.length === 0)) {
+  var filename = uri.uriParts.file;
+  if ((typeof filename == 'undefined') || (filename.length === 0)) {
+    filename = uri.uriParts.host;
+  }
+  if (filename === null) {
     var d = new Date();
     filename = "AutoGen_" + d.getTime();
   }
@@ -224,6 +227,7 @@ WebScraper.prototype.saveAsset = function() {
   } else {
     // pop one off
     var asset = this.assetQueue[0];
+    console.log(asset);
     if (this.urlsDownloaded[asset.url] === true) {
       this.assetQueue.shift();
       this.saveAsset();
@@ -244,7 +248,7 @@ WebScraper.prototype.downloadAssetSuccess = function(data) {
 
     self.saveFn(filename, data, "utf8", function(err, res) {
       if (err) {
-        console.log("ERROR!");
+        console.log("ERROR!", err);
       }
       self.urlsDownloaded[asset.url] = true;
       self.saveAsset();
