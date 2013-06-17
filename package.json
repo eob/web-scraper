@@ -1,6 +1,6 @@
 {
   "name": "web-scraper",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Helps you scrape a web page.",
   "keywords": [
     "scraper",
@@ -40,6 +40,13 @@
     "fetch-url": "*"
   },
   "devDependencies": {
+    "grunt": "*",
+    "grunt-contrib-jshint": "~0.1.1",
+    "grunt-contrib-nodeunit": "~0.1.2",
+    "grunt-contrib-uglify": "*",
+    "grunt-contrib-qunit": "*",
+    "grunt-contrib-concat": "*",
+    "grunt-contrib-watch": "*"
   },
   "engines": {
     "node": ">=0.1.9"

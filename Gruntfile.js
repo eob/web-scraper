@@ -19,7 +19,7 @@ module.exports = function(grunt) {
               " */\n"
     },
     concat: {
-      scraper-bin: {
+      "scraper-bin": {
         src : [
           "<banner>",
           "src/fragments/prefix._js",
@@ -29,7 +29,7 @@ module.exports = function(grunt) {
         ],
         dest : "release/scraper-bin.js"
       },
-      scraper-lib: {
+      "scraper-lib": {
         src : [
           "<banner>",
           "src/fragments/prefix._js",

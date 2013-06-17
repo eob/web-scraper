@@ -38,13 +38,14 @@ exports.run = function() {
     url: url,
     filename: pageName,
     basedir: outputDir
-  }
+  };
 
   var scraper = new Scraper(opts);
-  scraper.scrape(
-      function() {
-        console.log("\n\nSuccess!\n\n");
-      },
-      console.log
-  );
+  scraper.scrape(function(error, data) {
+    if (error) {
+      console.log("Failure!\n");
+    } else {
+      console.log("\n\nSuccess!\n\n");
+    }
+  });
 };

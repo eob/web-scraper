@@ -5,13 +5,32 @@
  * 3. Rewrite all paths in the HTML file to the new local directory structure
  * 4. Save all the assets
  */
-
 var Uri = require("jsuri");
 var FetchUrl = require("fetch-url");
 var _ = require("underscore");
 var jsdom = require("jsdom");
 var fs = require("fs");
 var path = require("path");
+
+/*
+ * A save function can be 
+ */
+var LocalSaveFn = function(pathAndFilename, data, type, cb) {
+  var pathname = path.dirname(pathAndFilename);
+  try {
+    if (! fs.existsSync(pathname)) {
+      fs.mkdirSync(pathname);
+    }
+    fs.writeFileSync(path.join(this.opts.basedir, this.opts.filename), data, "utf8");
+    cb(null, pathAndFilename);
+  } catch (e) {
+    cb(e);
+  }
+};
+
+var DontRenameFn = function(filename, data) {
+  return filename;
+};
 
 /*
  * Required
@@ -31,17 +50,24 @@ WebScraper = function(opts) {
   if (typeof this.opts.filename == 'undefined') {
     this.opts.filename = 'index.html';
   }
+  if (typeof this.opts.saveFn == 'undefined') {
+    this.saveFn = LocalSaveFn;
+  }
+  if (typeof this.opts.renameFn == 'undefined') {
+    this.renameFn = DontRenameFn;
+  }
 
   this.urlsDownloaded = {};
+  this.manifest = {};
 };
 
 WebScraper.prototype.endsWith = function(s, suffix) {
   return s.indexOf(suffix, s.length - suffix.length) !== -1;
-}
+};
 
 WebScraper.prototype.startsWith = function(s, suffix) {
   return s.indexOf(suffix) === 0;
-}
+};
 
 WebScraper.prototype.filenameForUrl = function(url, kind) {
   var uri = new Uri(url);
@@ -80,7 +106,7 @@ WebScraper.prototype.isRssLink = function(e) {
       (! _.isNull(e.prop('type'))) && 
       (e.prop('type').indexOf('rss') != 1)
   );
-}
+};
 
 /*
  * Given an HTML element that references a file, returns an object
@@ -132,7 +158,7 @@ WebScraper.prototype.extractFilespec = function(jqElem, fixToo) {
   } else if (jqElem.is('script')) {
     ret.binary = false;
     ret.url = jqElem.attr('src');
-    if (_.isUndefined(ret.url) || ret.url === null || ret.url == '') {
+    if (_.isUndefined(ret.url) || ret.url === null || ret.url === '') {
       ret = null;
     } else {
       ret.type = 'js';
@@ -142,11 +168,11 @@ WebScraper.prototype.extractFilespec = function(jqElem, fixToo) {
       }
     }
   }
-  if (ret != null) {
+  if (ret !== null) {
     ret.linkedFrom = this.opts.url;
   }
   return ret;
-}
+};
 
 /**
  * Rewrites HTML such that all images are
@@ -160,7 +186,7 @@ WebScraper.prototype.queueAndSaveAssets = function(html, success, failure) {
     if (fileSpec !== null) {
       self.assetQueue.push(fileSpec);
     }
-  }
+  };
 
   /*
    * Queue up all the assets to download
@@ -174,9 +200,9 @@ WebScraper.prototype.queueAndSaveAssets = function(html, success, failure) {
       } else {
         // Walk the DOM and get each asset.
         var $ = window.$;
-        _.each($('img'), function(elem) { considerElement($(elem)) });
-        _.each($('script'), function(elem) { considerElement($(elem)) });
-        _.each($('link'), function(elem) { considerElement($(elem)) });
+        _.each($('img'), function(elem) { considerElement($(elem)); });
+        _.each($('script'), function(elem) { considerElement($(elem)); });
+        _.each($('link'), function(elem) { considerElement($(elem)); });
         // Snag any asset URLs out of inline CSS
         _.each($('style'), function(elem) {
           var e = $(elem);
@@ -193,7 +219,7 @@ WebScraper.prototype.queueAndSaveAssets = function(html, success, failure) {
 };
 
 WebScraper.prototype.saveAsset = function() {
-  if (this.assetQueue.length == 0) {
+  if (this.assetQueue.length === 0) {
     this.queueAndSaveSuccess(this.fixedHtml);
   } else {
     // pop one off
@@ -202,30 +228,32 @@ WebScraper.prototype.saveAsset = function() {
       this.assetQueue.shift();
       this.saveAsset();
     } else {
-      FetchUrl(asset, this.saveAssetSuccess, this.saveAssetFailure, undefined, this);
+      FetchUrl(asset, this.downloadAssetSuccess, this.downloadAssetFailure, undefined, this);
     }
   }
 };
 
-WebScraper.prototype.saveAssetSuccess = function(data) {
+WebScraper.prototype.downloadAssetSuccess = function(data) {
   var asset = this.assetQueue.shift();
+  var self = this;
   try {
     if (asset.type == 'css') {
       data = this.fixCssAndQueueFurtherAssets(data, false, asset.url);
     }
     var filename = path.join(this.opts.basedir, asset.localUrl);
-    // Ensure the path
-    var pathname = path.dirname(filename);
-    if (! fs.existsSync(pathname)) {
-      fs.mkdirSync(pathname);
-    }
-    fs.writeFileSync(filename, data, "utf8");
-    this.urlsDownloaded[asset.url] = true;
+
+    self.saveFn(filename, data, "utf8", function(err, res) {
+      if (err) {
+        console.log("ERROR!");
+      }
+      self.urlsDownloaded[asset.url] = true;
+      self.saveAsset();
+    });
   } catch (e) {
     //console.log("Failed to save asset to disk");
     console.log(e);
+    this.saveAsset();
   }
-  this.saveAsset();
 };
 
 /**
@@ -238,7 +266,8 @@ WebScraper.prototype.fixCssAndQueueFurtherAssets = function(css, inlineCss, link
   if (inlineCss) {
     prefix = "images/";
   }
-  while (match = pat.exec(css)) {
+  var match = pat.exec(css);
+  while (match) {
     var url = match[1];
     // Avoid images that are serialized inline.
     if (! this.startsWith(this.filenameForUrl(url), "png;base64,")) {
@@ -256,24 +285,36 @@ WebScraper.prototype.fixCssAndQueueFurtherAssets = function(css, inlineCss, link
       var after = "url(" + cssUrl + ")";
       copy = copy.replace(before, after);
     }
+    match = pat.exec(css);
   }
   return copy;
 };
 
-WebScraper.prototype.saveAssetFailure = function(e) {
+WebScraper.prototype.downloadAssetFailure = function(e) {
   // Well.. nothing much can be done. We're not going to
   // hard fail here because so many sites have broken links.
   //console.log("Failed to download asset");
   //console.log(e);
   this.assetQueue.shift();
   this.saveAsset();
-}
-
-WebScraper.prototype.savePage = function(html) {
-  fs.writeFileSync(path.join(this.opts.basedir, this.opts.filename), html, "utf8");
 };
 
-WebScraper.prototype.scrape = function(success, failure) {
+WebScraper.prototype.savePage = function(html, cb) {
+  var fullPath = path.join(this.opts.basedir, this.opts.filename);
+  var self = this;
+  this.saveFn(fullPath, html, "utf8", function(error, loc) {
+    if (error) {
+      cb(error);
+    } else {
+      self.manifest.url = loc;
+      cb(null, loc);
+    }
+  });
+};
+
+WebScraper.prototype.scrape = function(cb) {
+  this.manifest = {};
+
   // Create the Workspace directory if it doesn't exist
   if (! fs.existsSync(this.opts.basedir)) {
     fs.mkdirSync(this.opts.basedir);
@@ -283,15 +324,20 @@ WebScraper.prototype.scrape = function(success, failure) {
     function(html) {
       this.queueAndSaveAssets(html,
         function(fixedHtml) {
-          this.savePage(fixedHtml);
-          success();
+          this.savePage(fixedHtml, function(err, loc) {
+            if (err) {
+              cb(err);
+            } else {
+              cb(null, this.manifest);
+            }
+          });
         },
         function(err) {
-          failure(err);
+          cb(err);
         }
       );
     }, function(err) {
-      failure(err);
+      cb(err);
     },
     'utf-8',
     this
