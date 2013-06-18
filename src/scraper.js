@@ -51,10 +51,10 @@ WebScraper = function(opts) {
     this.opts.filename = 'index.html';
   }
   if (typeof this.opts.saveFn == 'undefined') {
-    this.saveFn = LocalSaveFn;
+    this.opts.saveFn = LocalSaveFn;
   }
   if (typeof this.opts.renameFn == 'undefined') {
-    this.renameFn = DontRenameFn;
+    this.opts.renameFn = DontRenameFn;
   }
 
   this.urlsDownloaded = {};
@@ -273,7 +273,7 @@ WebScraper.prototype.downloadAssetSuccess = function(data) {
     var filename = path.join(this.opts.basedir, asset.localUrl);
     var mimeType = null;
 
-    self.saveFn(filename, data, asset.encoding, asset.mimeType, function(err, res) {
+    self.opts.saveFn(filename, data, asset.encoding, asset.mimeType, function(err, res) {
       if (err) {
       }
       self.urlsDownloaded[asset.url] = true;
@@ -332,7 +332,7 @@ WebScraper.prototype.downloadAssetFailure = function(e) {
 WebScraper.prototype.savePage = function(html, cb) {
   var fullPath = path.join(this.opts.basedir, this.opts.filename);
   var self = this;
-  this.saveFn(fullPath, html, "utf8", "text/html", function(error, loc) {
+  this.opts.saveFn(fullPath, html, "utf8", "text/html", function(error, loc) {
     if (error) {
       cb(error);
     } else {
