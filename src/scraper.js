@@ -236,7 +236,7 @@ WebScraper.prototype.queueAndSaveAssets = function(html, success, failure) {
         // Snag any asset URLs out of inline CSS
         _.each($('style'), function(elem) {
           var e = $(elem);
-          e.html(this.fixCssAndQueueFurtherAssets(e.html(), true, self.opts.url));
+          e.html(self.fixCssAndQueueFurtherAssets(e.html(), true, self.opts.url));
         });
         // Stash 'em away. Thar be ajax acomin'.
         self.fixedHtml = window.document.documentElement.innerHTML;
