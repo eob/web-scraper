@@ -56,6 +56,9 @@ WebScraper = function(opts) {
   if (typeof this.opts.renameFn == 'undefined') {
     this.opts.renameFn = DontRenameFn;
   }
+  if (typeof this.opts.createBaseDir == 'undefined') {
+    this.opts.createBaseDir = true;
+  }
 
   this.urlsDownloaded = {};
   this.manifest = {};
@@ -346,8 +349,10 @@ WebScraper.prototype.scrape = function(cb) {
   this.manifest = {};
 
   // Create the Workspace directory if it doesn't exist
-  if (! fs.existsSync(this.opts.basedir)) {
-    fs.mkdirSync(this.opts.basedir);
+  if (this.opts.createBaseDir) {
+    if (! fs.existsSync(this.opts.basedir)) {
+      fs.mkdirSync(this.opts.basedir);
+    }
   }
 
   FetchUrl(this.opts.url,
