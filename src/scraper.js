@@ -258,7 +258,7 @@ WebScraper.prototype.saveAsset = function() {
       this.assetQueue.shift();
       this.saveAsset();
     } else {
-      FetchUrl(asset, this.downloadAssetSuccess, this.downloadAssetFailure, undefined, this);
+      FetchUrl(asset, this.downloadAssetSuccess, this.downloadAssetFailure, asset.binary, this);
     }
   }
 };
